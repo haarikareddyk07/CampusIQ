@@ -71,7 +71,7 @@ with col1:
             st.warning("Please upload a resume in the sidebar first!")
         else:
             with st.spinner("Analyzing match..."):
-                model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 prompt = f"""
                 Analyze this student's resume against the opportunity details.
                 Resume: {resume_text}
@@ -91,7 +91,7 @@ with col2:
             st.warning("Please upload a resume in the sidebar first!")
         else:
             with st.spinner("Drafting custom application..."):
-                model = genai.GenerativeModel("gemini-1.5-flash-latest")
+                model = genai.GenerativeModel("gemini-1.5-flash")
                 prompt = f"""
                 Write a tailored 200-word Statement of Purpose/Application Essay for this student applying to {target_data['Title']}.
                 Student Resume Context: {resume_text}
