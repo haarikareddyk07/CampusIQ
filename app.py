@@ -87,7 +87,6 @@ with col1:
                     contents=prompt
                 )
                 st.write(response.text)
-
 with col2:
     if st.button("✍️ Generate Custom SOP / Essay"):
         if not resume_text:
@@ -105,3 +104,4 @@ with col2:
                     contents=prompt
                  )
                 st.text_area("Generated Output", response.text, height=250)
+
