@@ -92,13 +92,24 @@ with col2:
         if not resume_text:
             st.warning("Please upload a resume in the sidebar first!")
         else:
-            with st.spinner("Drafting custom application..."):
-                
-                prompt = f"""
-                Write a tailored 200-word Statement of Purpose/Application Essay for this student applying to {target_data['Title']}.
-                Student Resume Context: {resume_text}
-                Opportunity Details: {target_data['Description']}
-                """
-                 response = client.models.generate_content(model="gemini-2.5-flash",contents=prompt)
-                st.text_area("Generated Output", response.text, height=250)
+          with st.spinner("Drafting custom application..."):
+            prompt = f"""
+Write a tailored 200-word Statement of Purpose/Application Essay for this student applying to {target_data['Title']}.
 
+Student Resume Context:
+{resume_text}
+
+Opportunity Details:
+{target_data['Description']}
+"""
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+
+            st.text_area(
+                "Generated Output",
+                response.text,
+                height=250
+            )
