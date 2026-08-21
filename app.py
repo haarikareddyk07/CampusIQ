@@ -99,9 +99,6 @@ with col2:
                 Student Resume Context: {resume_text}
                 Opportunity Details: {target_data['Description']}
                 """
-                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt
-                 )
+                 response = client.models.generate_content(model="gemini-2.5-flash",contents=prompt)
                 st.text_area("Generated Output", response.text, height=250)
 
