@@ -2,12 +2,12 @@ import os
 import streamlit as st
 import pandas as pd
 from pypdf import PdfReader
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Load API keys
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 st.set_page_config(page_title="CampusIQ - AI Opportunity Agent", layout="wide")
 
@@ -71,7 +71,7 @@ with col1:
             st.warning("Please upload a resume in the sidebar first!")
         else:
             with st.spinner("Analyzing match..."):
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                
                 prompt = f"""
                 Analyze this student's resume against the opportunity details.
                 Resume: {resume_text}
@@ -82,7 +82,10 @@ with col1:
                 2. Key Strengths
                 3. Missing Skills/Gaps
                 """
-                response = model.generate_content(prompt)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
                 st.write(response.text)
 
 with col2:
@@ -91,11 +94,14 @@ with col2:
             st.warning("Please upload a resume in the sidebar first!")
         else:
             with st.spinner("Drafting custom application..."):
-                model = genai.GenerativeModel("gemini-1.5-flash")
+                
                 prompt = f"""
                 Write a tailored 200-word Statement of Purpose/Application Essay for this student applying to {target_data['Title']}.
                 Student Resume Context: {resume_text}
                 Opportunity Details: {target_data['Description']}
                 """
-                response = model.generate_content(prompt)
+                 response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                 )
                 st.text_area("Generated Output", response.text, height=250)
