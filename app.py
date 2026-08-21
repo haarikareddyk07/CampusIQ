@@ -7,7 +7,10 @@ from dotenv import load_dotenv
 
 # Load API keys
 load_dotenv()
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+import streamlit as st
+from google import genai
+client = 
+genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 st.set_page_config(page_title="CampusIQ - AI Opportunity Agent", layout="wide")
 
