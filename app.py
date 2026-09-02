@@ -117,14 +117,19 @@ Opportunity Details:
 {target_data['Description']}
 """
                 try:
+                    # Primary attempt
                     response = client.models.generate_content(
-                        model="gemini-3.6-flash",
+                        model="gemini-2.5-flash",
                         contents=prompt,
                     )
-                    st.text_area(
-                        "Generated Output",
-                        response.text,
-                        height=250
-                    )
+                    st.text_area("Generated Output", response.text, height=250)
                 except Exception as e:
-                    st.error(f"Failed to generate SOP: {e}")
+                    # Fallback attempt if 503 high demand occurs
+                    try:
+                        response = client.models.generate_content(
+                            model="gemini-1.5-flash",
+                            contents=prompt,
+                        )
+                        st.text_area("Generated Output", response.text, height=250)
+                    except Exception as fallback_error:
+                        st.error("Server is busy right now. Please wait a few seconds and try again!")
