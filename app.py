@@ -73,7 +73,22 @@ st.subheader("⚡ AI Application Copilot")
 
 selected_opp = st.selectbox("Select an opportunity to apply for:", [op["Title"] for op in OPPORTUNITIES])
 target_data = next(item for item in OPPORTUNITIES if item["Title"] == selected_opp)
+import time
 
+def generate_content_with_retry(client, prompt, retries=3, delay=2):
+    """Helper function to retry model requests on 503 high-demand errors."""
+    for attempt in range(retries):
+        try:
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+            )
+        except Exception as e:
+            if "503" in str(e) or "UNAVAILABLE" in str(e):
+                if attempt < retries - 1:
+                    time.sleep(delay * (attempt + 1))  # Pauses 2s, then 4s before trying again
+                    continue
+            raise e
 col1, col2 = st.columns(2)
 
 with col1:
@@ -93,14 +108,11 @@ Provide:
 3. Missing Skills/Gaps
 """
                 try:
-                    response = client.models.generate_content(
-                        model="gemini-3.6-flash",
-                        contents=prompt,
-                    )
+                    response = generate_content_with_retry(client,prompt)
                     st.write(response.text)
                 except Exception as e:
-                    st.error(f"Failed to calculate match score: {e}")
-
+                    st.error(f"Failed to calculate match score:{e}")
+                    
 with col2:
     if st.button("✍️ Generate Custom SOP / Essay"):
         if not resume_text:
@@ -118,18 +130,7 @@ Opportunity Details:
 """
                 try:
                     # Primary attempt
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=prompt,
-                    )
+                    response = generate_content_with_retry(client,prompt)
                     st.text_area("Generated Output", response.text, height=250)
                 except Exception as e:
-                    # Fallback attempt if 503 high demand occurs
-                    try:
-                        response = client.models.generate_content(
-                            model="gemini-1.5-flash",
-                            contents=prompt,
-                        )
-                        st.text_area("Generated Output", response.text, height=250)
-                    except Exception as fallback_error:
-                        st.error("Server is busy right now. Please wait a few seconds and try again!")
+                    st.error(f"Failed to generate SOP:{e}")
