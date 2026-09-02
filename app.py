@@ -1,18 +1,18 @@
 import os
 import time
+import re
 import streamlit as st
 import pandas as pd
 from pypdf import PdfReader
 from google import genai
 from dotenv import load_dotenv
 
-# Page setup must be called at the very top of Streamlit execution
+# Page setup
 st.set_page_config(page_title="CampusIQ - AI Opportunity Agent", layout="wide")
 
 # Load API keys & initialize Gemini Client
 load_dotenv()
 
-# Safely fetch API Key from Streamlit Secrets or Environment Variables
 api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 if not api_key:
@@ -105,14 +105,25 @@ Analyze this student's resume against the opportunity details.
 Resume: {resume_text}
 Opportunity: {target_data['Title']} - {target_data['Description']} (Domains: {target_data['Domain']})
 
-Provide:
-1. Match Percentage (0-100%)
-2. Key Strengths
-3. Missing Skills/Gaps
+Provide output strictly in this format:
+Match Percentage: XX%
+Key Strengths:
+- ...
+Missing Skills/Gaps:
+- ...
 """
                 try:
                     response = generate_content_with_retry(client, prompt)
-                    st.write(response.text)
+                    text_output = response.text
+                    
+                    # Extract percentage for visual display
+                    match_score = re.search(r"(\d{1,3})%", text_output)
+                    if match_score:
+                        score_val = int(match_score.group(1))
+                        st.metric(label="Match Score", value=f"{score_val}%")
+                        st.progress(score_val / 100)
+                    
+                    st.markdown(text_output)
                 except Exception as e:
                     st.error(f"Failed to calculate match score: {e}")
 
@@ -133,6 +144,16 @@ Opportunity Details:
 """
                 try:
                     response = generate_content_with_retry(client, prompt)
-                    st.text_area("Generated Output", response.text, height=250)
+                    sop_text = response.text
+                    
+                    st.text_area("Generated Output", sop_text, height=220)
+                    
+                    # New Feature: Download Button
+                    st.download_button(
+                        label="📥 Download SOP as Text File",
+                        data=sop_text,
+                        file_name=f"{selected_opp.replace(' ', '_')}_SOP.txt",
+                        mime="text/plain"
+                    )
                 except Exception as e:
                     st.error(f"Failed to generate SOP: {e}")
