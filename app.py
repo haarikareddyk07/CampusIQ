@@ -1,17 +1,20 @@
 import os
 import time
 import re
-import streamlit as st
+import json
 import pandas as pd
+import streamlit as st
 from pypdf import PdfReader
 from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
-# Page setup
+# Page setup must be called at the very top of Streamlit execution
 st.set_page_config(page_title="CampusIQ - AI Opportunity Agent", layout="wide")
 
 # Load API keys & initialize Gemini Client
 load_dotenv()
+
 api_key = st.secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY")
 
 if not api_key:
@@ -24,7 +27,7 @@ client = genai.Client(api_key=api_key)
 st.title("🎓 CampusIQ: AI Opportunity Agent")
 st.caption("Find tailored hackathons, internships & auto-generate application assets.")
 
-# Initialize default opportunity list in Session State
+# Default Dataset of Opportunities
 DEFAULT_OPPORTUNITIES = [
     {
         "Title": "Smart India Hackathon 2026",
@@ -49,6 +52,7 @@ DEFAULT_OPPORTUNITIES = [
     }
 ]
 
+# Store opportunities state in Streamlit Session State
 if "opportunities" not in st.session_state:
     st.session_state["opportunities"] = DEFAULT_OPPORTUNITIES
 
@@ -66,14 +70,20 @@ if uploaded_file:
     st.sidebar.success("Resume Parsed Successfully!")
 
 
-def generate_content_with_retry(client, prompt, retries=3, delay=2, tools=None):
-    """Helper function with retry logic and tool support."""
+def generate_content_with_retry(client, prompt, retries=3, delay=2, enable_search=False):
+    """Helper function to handle API calls with exponential backoff and search grounding."""
     for attempt in range(retries):
         try:
+            config = None
+            if enable_search:
+                config = types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())]
+                )
+            
             return client.models.generate_content(
                 model="gemini-3.6-flash",
                 contents=prompt,
-                config={"tools": tools} if tools else None
+                config=config
             )
         except Exception as e:
             if "503" in str(e) or "UNAVAILABLE" in str(e):
@@ -83,7 +93,7 @@ def generate_content_with_retry(client, prompt, retries=3, delay=2, tools=None):
             raise e
 
 
-# Display and Manage Opportunities Section
+# Opportunities Section Header & Actions
 st.subheader("📌 Active Opportunities")
 
 col_fetch, col_reset = st.columns([3, 1])
@@ -92,29 +102,34 @@ with col_fetch:
     if st.button("🔍 Fetch Live Active Opportunities via AI"):
         with st.spinner("Searching the live web for currently active hackathons & internships..."):
             prompt = """
-            Search the web for current active tech hackathons, open source programs, or student internships accepting applications in the next 30-60 days.
+            Search for 3 real, currently active tech hackathons or student internships accepting applications.
+            Output ONLY a valid JSON list of objects without markdown headers, conversational commentary, or explanation.
             
-            Return a JSON array of 3 top opportunities using EXACTLY this schema:
+            Use EXACTLY this schema:
             [
               {
-                "Title": "Name",
+                "Title": "Opportunity Name",
                 "Type": "Hackathon or Internship",
                 "Deadline": "YYYY-MM-DD",
-                "Domain": "Relevant skills",
-                "Description": "Brief overview"
+                "Domain": "Field/Skills needed",
+                "Description": "Brief summary"
               }
             ]
-            Provide ONLY raw valid JSON text without markdown codeblocks or extra prose.
             """
             try:
-                # Grounded with Google Search enabled
-                response = generate_content_with_retry(client, prompt, tools=[{"type": "google_search"}])
-                raw_text = response.text.replace("```json", "").replace("```", "").strip()
-                import json
-                new_data = json.loads(raw_text)
-                st.session_state["opportunities"] = new_data
-                st.success("Successfully fetched live opportunities!")
-                st.rerun()
+                response = generate_content_with_retry(client, prompt, enable_search=True)
+                raw_text = response.text.strip()
+                
+                # Extract clean JSON array via Regex
+                match = re.search(r"\[\s*\{.*\}\s*\]", raw_text, re.DOTALL)
+                if match:
+                    clean_json = match.group(0)
+                    new_data = json.loads(clean_json)
+                    st.session_state["opportunities"] = new_data
+                    st.success("Fetched live opportunities successfully!")
+                    st.rerun()
+                else:
+                    st.error("Could not parse JSON response from AI search. Please try clicking again.")
             except Exception as e:
                 st.error(f"Failed to fetch live listings: {e}")
 
@@ -123,7 +138,7 @@ with col_reset:
         st.session_state["opportunities"] = DEFAULT_OPPORTUNITIES
         st.rerun()
 
-# Editable DataFrame Table (Option 1 + Option 2 Combined)
+# Editable DataFrame Grid
 st.markdown("*Double click any cell to edit details, or click the '+' row at the bottom to manually add custom listings:*")
 df = pd.DataFrame(st.session_state["opportunities"])
 
@@ -134,15 +149,15 @@ edited_df = st.data_editor(
     key="opportunities_editor"
 )
 
-# Convert edited data back into a list of dicts for model evaluation
+# Sync table modifications back into active dictionary
 active_list = edited_df.to_dict(orient="records")
 
-# Feature: AI Matcher & Copilot
+# Feature: AI Matcher & Copilot Section
 st.divider()
 st.subheader("⚡ AI Application Copilot")
 
 if not active_list:
-    st.warning("No opportunities available. Add rows above or click 'Reset Default Dataset'.")
+    st.warning("No opportunities available in table. Add rows above or click 'Reset Default Dataset'.")
     st.stop()
 
 opp_titles = [op["Title"] for op in active_list if op.get("Title")]
@@ -173,6 +188,7 @@ Missing Skills/Gaps:
                     response = generate_content_with_retry(client, prompt)
                     text_output = response.text
                     
+                    # Extract score for visual metric display
                     match_score = re.search(r"(\d{1,3})%", text_output)
                     if match_score:
                         score_val = int(match_score.group(1))
