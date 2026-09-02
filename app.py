@@ -81,7 +81,7 @@ def generate_content_with_retry(client, prompt, retries=3, delay=2, enable_searc
                 )
             
             return client.models.generate_content(
-                model="gemini-3.6-flash",
+                model="gemini-2.5-flash",
                 contents=prompt,
                 config=config
             )
